@@ -5,12 +5,24 @@ import datetime
 import pandas as pd
 import matplotlib.pyplot as plt
 
-# ---------------- PAGE CONFIG ----------------
-st.set_page_config(page_title="Skill Decay Tracker", layout="centered")
+# ====================== PAGE CONFIG ======================
+st.set_page_config(
+    page_title="Skill Decay Tracker",
+    page_icon="🧠",
+    layout="centered"
+)
+# ================= LOAD CSS =================
+def load_css():
+    with open("assets/style.css") as f:
+        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
-# ---------------- DATABASE ----------------
+load_css()
+
+# ====================== DATABASE ======================
+DB_NAME = "skill_decay.db"
+
 def get_connection():
-    return sqlite3.connect("skill_decay.db", check_same_thread=False)
+    return sqlite3.connect(DB_NAME, check_same_thread=False)
 
 def create_tables():
     conn = get_connection()
@@ -40,18 +52,28 @@ def create_tables():
 
 create_tables()
 
-# ---------------- SESSION ----------------
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
+# ====================== SESSION ======================
 if "user_id" not in st.session_state:
     st.session_state.user_id = None
+    st.session_state.username = None
 
-# ---------------- AUTH ----------------
-def register(username, password):
+# ====================== UI HELPERS ======================
+def card(text):
+    st.markdown(
+        f"""
+        <div class="neon-card">
+            {text}
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+# ====================== AUTH ======================
+def register_user(username, password):
     conn = get_connection()
     c = conn.cursor()
     try:
-        c.execute("INSERT INTO users (username, password) VALUES (?,?)",
+        c.execute("INSERT INTO users (username,password) VALUES (?,?)",
                   (username, password))
         conn.commit()
         return True
@@ -60,29 +82,35 @@ def register(username, password):
     finally:
         conn.close()
 
-def login(username, password):
+def login_user(username, password):
     conn = get_connection()
     c = conn.cursor()
     c.execute("SELECT id FROM users WHERE username=? AND password=?",
               (username, password))
-    user = c.fetchone()
+    row = c.fetchone()
     conn.close()
-    return user
+    return row[0] if row else None
 
-# ---------------- LOGIN / REGISTER UI ----------------
-if not st.session_state.logged_in:
-    st.title("🔐 Skill Decay Tracker")
-
-    tab1, tab2 = st.tabs(["Login", "Register"])
+# ====================== LOGIN / REGISTER ======================
+if st.session_state.user_id is None:
+    st.markdown("""
+<h1 style="text-align:center; font-size:42px;">
+🧠 Skill Decay Tracker
+</h1>
+<p style="text-align:center; color:#94a3b8; font-size:18px;">
+Track, visualize & protect your skills over time
+</p>
+""", unsafe_allow_html=True)
+    tab1, tab2 = st.tabs(["🔐 Login", "📝 Register"])
 
     with tab1:
         u = st.text_input("Username")
         p = st.text_input("Password", type="password")
         if st.button("Login"):
-            user = login(u, p)
-            if user:
-                st.session_state.logged_in = True
-                st.session_state.user_id = user[0]
+            uid = login_user(u, p)
+            if uid:
+                st.session_state.user_id = uid
+                st.session_state.username = u
                 st.success("Login successful 🎉")
                 st.rerun()
             else:
@@ -92,137 +120,127 @@ if not st.session_state.logged_in:
         ru = st.text_input("New Username")
         rp = st.text_input("New Password", type="password")
         if st.button("Register"):
-            if register(ru, rp):
-                st.success("Registered successfully 🎉 Now login")
+            if register_user(ru, rp):
+                st.success("Registered! Please login 👌")
             else:
                 st.error("Username already exists")
 
     st.stop()
 
-# ---------------- LOGOUT ----------------
-st.sidebar.success("Logged in")
-if st.sidebar.button("Logout"):
-    st.session_state.logged_in = False
+# ====================== SIDEBAR ======================
+st.sidebar.success(f"👋 {st.session_state.username}")
+if st.sidebar.button("🚪 Logout"):
     st.session_state.user_id = None
+    st.session_state.username = None
     st.rerun()
 
-# ---------------- APP MAIN ----------------
-st.title("🧠 Skill Decay Tracker")
-st.write("Track how your skills decay and get smart practice guidance.")
-
-conn = get_connection()
-c = conn.cursor()
-
-# ---------------- ADD / UPDATE SKILL ----------------
-st.sidebar.subheader("➕ Add / Update Skill")
+# ====================== ADD / UPDATE SKILL ======================
+st.sidebar.header("➕ Add / Update Skill")
 
 skill_name = st.sidebar.text_input("Skill name")
-last_date = st.sidebar.date_input("Last practiced date", datetime.date.today())
+last_practice = st.sidebar.date_input("Last practiced", datetime.date.today())
 decay_rate = st.sidebar.slider("Decay rate", 0.01, 0.1, 0.04)
 
-if st.sidebar.button("Save Skill"):
+if st.sidebar.button("💾 Save Skill"):
+    conn = get_connection()
+    c = conn.cursor()
     c.execute("""
-    INSERT INTO skills (user_id, skill_name, last_practice, decay_rate)
+    INSERT OR REPLACE INTO skills (user_id, skill_name, last_practice, decay_rate)
     VALUES (?,?,?,?)
-    ON CONFLICT(user_id, skill_name)
-    DO UPDATE SET last_practice=excluded.last_practice,
-                  decay_rate=excluded.decay_rate
     """, (
         st.session_state.user_id,
         skill_name,
-        last_date.isoformat(),
+        last_practice.isoformat(),
         decay_rate
     ))
     conn.commit()
-    st.sidebar.success("Skill saved / updated ✅")
+    conn.close()
+    st.sidebar.success("Skill saved ✅")
     st.rerun()
 
-# ---------------- LOAD USER SKILLS ----------------
-c.execute("SELECT skill_name, last_practice, decay_rate FROM skills WHERE user_id=?",
-          (st.session_state.user_id,))
-rows = c.fetchall()
+# ====================== LOAD USER SKILLS ======================
+conn = get_connection()
+df = pd.read_sql(
+    "SELECT * FROM skills WHERE user_id=?",
+    conn,
+    params=(st.session_state.user_id,)
+)
+conn.close()
 
-if not rows:
-    st.info("No skills added yet.")
+st.markdown("""
+<h2 style="text-align:center;">
+📊 Your Skill Dashboard
+</h2>
+<p style="text-align:center; color:#94a3b8;">
+Monitor how fast your skills decay & when to practice
+</p>
+""", unsafe_allow_html=True)
+
+
+if df.empty:
+    card("⚠️ No skills added yet. Add one from the sidebar.")
     st.stop()
 
-skills = {r[0]: {"last_practice": r[1], "decay_rate": r[2]} for r in rows}
+skill = st.selectbox("Select a skill", df["skill_name"].tolist())
+row = df[df["skill_name"] == skill].iloc[0]
 
-# ---------------- SELECT SKILL ----------------
-skill = st.selectbox("Select a skill", list(skills.keys()))
-last_practice = datetime.date.fromisoformat(skills[skill]["last_practice"])
-decay_rate = skills[skill]["decay_rate"]
-
-# ---------------- DELETE SKILL ----------------
-if st.button("❌ Delete Skill"):
-    c.execute("DELETE FROM skills WHERE user_id=? AND skill_name=?",
-              (st.session_state.user_id, skill))
+# ====================== DELETE SKILL ======================
+if st.button("🗑️ Delete Skill"):
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("DELETE FROM skills WHERE id=?", (row["id"],))
     conn.commit()
-    st.warning("Skill deleted")
+    conn.close()
+    st.warning("Skill deleted ❌")
     st.rerun()
 
-# ---------------- DECAY LOGIC ----------------
-today = datetime.date.today()
-days_passed = (today - last_practice).days
-decay_score = round(100 * math.exp(-decay_rate * days_passed), 2)
+# ====================== DECAY CALCULATION ======================
+last = datetime.date.fromisoformat(row["last_practice"])
+days = (datetime.date.today() - last).days
+decay_score = round(100 * math.exp(-row["decay_rate"] * days), 2)
 
-# ---------------- DECAY STATUS ----------------
-st.subheader("📉 Skill Strength")
-st.metric("Current Skill Level", f"{decay_score}%")
+# ====================== STATUS ======================
+card(f"""
+### 🧠 {skill}
+**Skill Strength:** {decay_score}%  
+**Days since last practice:** {days}
+""")
 
 if decay_score > 70:
-    st.success("🟢 Healthy skill")
+    st.success("🟢 Skill is healthy")
 elif decay_score > 40:
-    st.warning("🟠 Needs practice")
+    st.warning("🟠 Skill needs attention")
 else:
-    st.error("🔴 Skill decay critical")
+    st.error("🔴 Skill is dying — PRACTICE NOW!")
 
-st.info("Decay shows how skill strength reduces when not practiced.")
-
-# ---------------- GRAPH ----------------
-days = list(range(0, days_passed + 1))
-values = [100 * math.exp(-decay_rate * d) for d in days]
+# ====================== GRAPH ======================
+x = list(range(days + 1))
+y = [100 * math.exp(-row["decay_rate"] * d) for d in x]
 
 fig, ax = plt.subplots()
-ax.plot(days, values, linewidth=3)
-ax.fill_between(days, values, alpha=0.3)
-ax.set_xlabel("Days since last practice")
-ax.set_ylabel("Skill strength (%)")
+ax.plot(x, y, linewidth=3)
+ax.fill_between(x, y, alpha=0.3)
+ax.set_xlabel("Days")
+ax.set_ylabel("Skill Strength (%)")
 ax.set_title("Skill Decay Curve")
 
 st.pyplot(fig)
 
-# ---------------- FUN REMINDERS ----------------
-if days_passed > 7:
-    st.toast("📢 Your skill misses you. Time to practice!", icon="⏰")
-
+# ====================== FUN REMINDERS ======================
+if days > 5:
+    st.toast("⏰ Your skill is getting rusty… practice today!", icon="⚡")
 if decay_score < 40:
-    st.toast("🔥 Skill decay alert! Practice now.", icon="🚨")
+    st.toast("🔥 Placement alert! This skill needs love ASAP.", icon="🚨")
 
-# ---------------- PRACTICE RECOMMENDATION ----------------
-st.subheader("🛠️ Practice Recommendation")
-
+# ====================== PRACTICE RECOMMENDATION ======================
+st.subheader("🛠️ What should you do now?")
 if decay_score > 75:
-    st.write("😎 Light revision once a week")
+    card("😎 Chill — revise once a week")
 elif decay_score > 40:
-    st.write("🙂 Practice 3 times a week")
+    card("🙂 Practice 3x per week")
 else:
-    st.write("🚨 Daily intensive practice needed")
+    card("💀 Emergency mode: DAILY practice")
 
-# ---------------- ADJACENT SKILLS ----------------
-st.subheader("🧭 Adjacent Skills")
-
-adjacent = {
-    "Python": ["Automation", "Data Analysis", "Machine Learning"],
-    "Machine Learning": ["Deep Learning", "MLOps"],
-    "Web Development": ["React", "APIs"]
-}
-
-for s in adjacent.get(skill, ["Problem Solving", "System Design"]):
-    st.write("•", s)
-
-# ---------------- FOOTER ----------------
+# ====================== FOOTER ======================
 st.markdown("---")
-st.caption("🚀 Hackathon Prototype | Skill Decay Tracker")
-
-conn.close()
+st.caption("🚀 Hackathon Prototype | Skill Decay Tracker | Built by Roshani")

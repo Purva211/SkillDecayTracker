@@ -1,0 +1,72 @@
+/* ================= GLOBAL ================= */
+html, body {
+    background: linear-gradient(135deg, #f5f7ff, #eef2ff);
+    color: #1e293b;
+    font-family: 'Inter', sans-serif;
+}
+
+/* ================= SIDEBAR ================= */
+section[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, #e0e7ff, #fdf4ff);
+    border-right: 1px solid #c7d2fe;
+}
+
+/* ================= HEADINGS ================= */
+h1, h2, h3 {
+    color: #4f46e5;
+    font-weight: 700;
+}
+
+/* ================= INPUTS ================= */
+input, textarea {
+    background-color: #ffffff !important;
+    color: #1e293b !important;
+    border-radius: 14px !important;
+    border: 1px solid #a5b4fc !important;
+}
+
+/* ================= SELECT BOX ================= */
+div[data-baseweb="select"] > div {
+    background-color: #ffffff !important;
+    border-radius: 14px !important;
+    border: 1px solid #a5b4fc !important;
+}
+
+/* ================= BUTTONS ================= */
+button {
+    background: linear-gradient(135deg, #6366f1, #ec4899) !important;
+    color: white !important;
+    border-radius: 16px !important;
+    font-weight: 600 !important;
+    padding: 10px 18px !important;
+    border: none !important;
+    transition: 0.25s ease;
+}
+
+button:hover {
+    transform: scale(1.05);
+    box-shadow: 0 8px 24px rgba(99,102,241,0.35);
+}
+
+/* ================= CARDS ================= */
+.neon-card {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(12px);
+    border-radius: 22px;
+    padding: 22px;
+    margin-bottom: 18px;
+    border: 1px solid #e0e7ff;
+    box-shadow: 0 12px 30px rgba(99,102,241,0.15);
+}
+
+/* ================= TOAST ================= */
+div[data-testid="stToast"] {
+    background-color: #ffffff;
+    border-left: 5px solid #6366f1;
+    color: #1e293b;
+}
+
+/* ================= FOOTER REMOVE ================= */
+footer {
+    visibility: hidden;
+}
