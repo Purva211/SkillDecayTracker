@@ -1,14 +1,14 @@
 {
-  "Python": {
-    "last_practice": "2025-01-01",
-    "decay_rate": 0.02
-  },
-  "Machine Learning": {
-    "last_practice": "2024-12-15",
-    "decay_rate": 0.03
-  },
-  "Web Development": {
-    "last_practice": "2025-01-10",
-    "decay_rate": 0.015
-  }
+    "Python": {
+        "last_practice": "2025-12-01",
+        "decay_rate": 0.04
+    },
+    "Machine Learning": {
+        "last_practice": "2025-11-20",
+        "decay_rate": 0.06
+    },
+    "DSA": {
+        "last_practice": "2023-12-01",
+        "decay_rate": 0.04
+    }
 }
